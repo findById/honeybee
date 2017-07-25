@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <style>
+        .graph-info .label_1 {
+            border-bottom: 2px solid #71c73e;
+            color: #71c73e;
+        }
+
+        .graph-info .label_2 {
+            border-bottom: 2px solid #77b7c5;
+            color: #77b7c5;
+        }
+    </style>
+
+</head>
+<body>
+<div class="graph-info">
+    <label class="label_1">温度</label>
+    <label class="label_2">湿度</label>
+
+    <a href="javascript:loadSensorList(10)">10</a>
+    <a href="javascript:loadSensorList(50)">50</a>
+    <a href="javascript:loadSensorList(100)">100</a>
+    <a href="javascript:loadSensorList(200)">200</a>
+    <a href="javascript:loadSensorList(500)">500</a>
+    <a href="javascript:loadSensorList(1000)">1000</a>
+</div>
+<div id="graph-view"></div>
+
+<script src="/static/jquery-3.2.1.min.js"></script>
+<script src="/static/echarts.min.js"></script>
+<script src="/static/graph.one.js"></script>
+<script src="/static/graph.sht.js"></script>
+<script>
+    loadSensorList(50);
+
+    function loadSensorList(size) {
+        $.ajax({
+            type: "GET",
+            url: "/sensor/find?deviceId={{.deviceId}}",
+            dataType: "json",
+            success: function (data) {
+                if (data.statusCode != "200") {
+                    console.log(data.message);
+                    return
+                }
+                var graph = document.getElementById("graph-view");
+                for (var i = 0; i < data.result.length; i++) {
+                    var divId = 'div' + i;
+                    if (!document.getElementById(divId)) {
+                        // 为ECharts准备一个Dom
+                        var div = document.createElement('div');
+                        div.id = divId;
+                        div.style.width = '100%';
+                        div.style.height = '300px';
+
+//                        document.body.appendChild(div);
+                        graph.appendChild(div);
+                    }
+
+                    var item = data.result[i];
+                    switch (item.type) {
+                        case "DHT11": {
+                            loadDataNode(item.deviceId, item.sensorId, item.name, size, divId);
+                            break;
+                        }
+                        default:
+                            loadDataNode(item.deviceId, item.sensorId, item.name, size, divId);
+                            break;
+                    }
+                }
+            },
+            error: function (jqXHR) {
+                console.log("发生错误" + jqXHR.status);
+            }
+        });
+    }
+
+    function loadDataNode(deviceId, sensorId, sensorName, size, div) {
+        $.ajax({
+            type: "GET",
+            url: "/sensor/data/find?deviceId=" + deviceId + "&sensorId=" + sensorId + "&size=" + size,
+            dataType: "json",
+            success: function (data) {
+                if (data.statusCode != "200") {
+                    console.log(data.message);
+                    return;
+                }
+
+                var dataList = new Array();
+                var showType = 0;
+
+                for (var i = 0; i < data.result.length; i++) {
+                    var item = data.result[i];
+                    switch (item.dataType) {
+                        case "0": {
+                            showType = 1;
+                            var tempList = item.metadata.split(",");
+                            for (var j = 0; j < tempList.length; j++) {
+                                var xx = new Array();
+                                xx[0] = item.timestamp.split(" ")[1].substring(0, 5);
+                                xx[1] = tempList[j];
+                                if (!dataList[j]) {
+                                    dataList[j] = new Array();
+                                }
+                                dataList[j].push(xx);
+                            }
+                            break;
+                        }
+                        default: {
+                            showType = 0;
+                            var xx = new Array();
+                            xx[0] = item.timestamp.split(" ")[1].substring(0, 5);
+                            xx[1] = item.metadata;
+                            dataList.push(xx);
+                            break;
+                        }
+                    }
+                }
+                if (showType == 0) {
+                    updateTemplateOne(dataList, sensorName, div);
+                } else {
+                    switch (dataList.length) {
+                        case 1: { // 一列数据
+                            updateTemplateOne(dataList[0], sensorName, div);
+                            break;
+                        }
+                        case 2: { // 两列数据
+                            updateGraphSHT(dataList[0], dataList[1], sensorName, div);
+                            break;
+                        }
+                        default: {
+                            console.log("unsupported type: " + dataList.length);
+                            break;
+                        }
+                    }
+                }
+            },
+            error: function (jqXHR) {
+                console.log("发生错误" + jqXHR.status);
+            }
+        });
+    }
+</script>
+</body>
+</html>
