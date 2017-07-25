@@ -56,7 +56,14 @@ func SaveDataNodeHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(b)
 		return
 	}
-
+	_, err = v1.FindSensorById(data["deviceId"], data["sensorId"])
+	if err != nil {
+		result["statusCode"] = "401"
+		result["message"] = "Invalid device info"
+		b, _ := json.Marshal(result)
+		w.Write(b)
+		return
+	}
 	item := &v1.DataNode{
 		DeviceId:  data["deviceId"],
 		SensorId:  data["sensorId"],
